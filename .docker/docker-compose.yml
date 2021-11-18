@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+    rotate:
+        build:
+            args:
+                USER_NAME: '${USER_NAME}'
+                REPO: '${REPO}'
+            dockerfile: '.docker/rotator/Dockerfile'
+            context: '..'
+            target: 'dev'
+        image: 'kohirens/iam-user-key-rotator'
+        volumes:
+            - '../:/home/${USER_NAME}/src/${REPO}'
+            - '~/.ssh/known_hosts:/home/${USER_NAME}/.ssh/known_hosts'
+            - 'vscode:/home/${USER_NAME}/.vscode-server'
+            - 'vscode_i:/home/${USER_NAME}/.vscode-server-insiders'
+
+    localstack:
+#        container_name: "${LOCALSTACK_DOCKER_NAME-localstack_main}"
+        image: localstack/localstack
+        network_mode: bridge
+        ports:
+#            - "127.0.0.1:53:53"                # only required for Pro
+#            - "127.0.0.1:53:53/udp"            # only required for Pro
+#            - "127.0.0.1:443:443"              # only required for Pro
+#            - "127.0.0.1:4510-4530:4510-4530"  # only required for Pro
+            - "127.0.0.1:4566:4566"
+            - "127.0.0.1:4571:4571"
+        environment:
+            - SERVICES=${SERVICES- }
+            - DEBUG=${DEBUG- }
+            - DATA_DIR=${DATA_DIR- }
+            - LAMBDA_EXECUTOR=${LAMBDA_EXECUTOR- }
+#            - LOCALSTACK_API_KEY=${LOCALSTACK_API_KEY- }  # only required for Pro
+            - HOST_TMP_FOLDER=${TMPDIR:-/tmp/}localstack
+            - DOCKER_HOST=unix:///var/run/docker.sock
+        volumes:
+            - "localstack:/tmp/localstack"
+            - "/var/run/docker.sock:/var/run/docker.sock"
+            - './local-stack/init-aws.sh:/docker-entrypoint-initaws.d/init-aws.sh'
+            - '../tmp:/test-tmp'
+
+# alias laws='aws --endpoint-url=http://localstack:4566'
+    awscli:
+        build:
+            args:
+                USER_NAME: '${USER_NAME}'
+                REPO: '${REPO}'
+            dockerfile: '.docker/aws-cli/Dockerfile'
+            context: '..'
+        volumes:
+            - "./aws-cli/config:/root/.aws/config"
+            - "./aws-cli/credentials:/root/.aws/credentials"
+
+volumes:
+    vscode: null
+    vscode_i: null
+    localstack: null
+
+networks:
+    roro: null

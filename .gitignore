@@ -1,6 +1,8 @@
 # Directories
 # -----------
 /.idea/
+/tmp/
+/vendor/
 
 # Files
 # -----
