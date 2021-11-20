@@ -65,6 +65,7 @@ func main() {
 	numKeys := len(liko.AccessKeyMetadata)
 
 	// 3. Read IAM user keys.
+	// TODO: refactor as func getIamKeys
 	for i, v := range liko.AccessKeyMetadata {
 		// Calculate how many days old the key is.
 		daysOld := DaysOld(v.CreateDate)
@@ -86,18 +87,12 @@ func main() {
 	log.Printf("\t%v will be removed", len(deleteKeys))
 
 	// make sure there is room to make a new key.
-	for _, v := range deleteKeys {
-		// delete all keys marked for deletion, except the one we are using.
-		if *v.AccessKeyId != currentId {
-			daki := &iam.DeleteAccessKeyInput{AccessKeyId: v.AccessKeyId}
-			_, err7 := iamClient.DeleteAccessKey(context.TODO(), daki)
-			if err7 != nil {
-				mainErr = fmt.Errorf("could not delete key %q; %v", *v.AccessKeyId, err7.Error())
-			}
-			log.Printf("removed key %v\n", *v.AccessKeyId)
-		}
+	if errX := makeRoomForKey(currentId, deleteKeys, iamClient); errX != nil {
+		mainErr = errX
+		return
 	}
 
+	// TODO: Extract as func validKeys
 	numValidKeys := len(validKeys)
 	if numValidKeys > maxKeysAllowed {
 		// delete keys that we are not using, until we get to the max allowed.
@@ -159,4 +154,35 @@ func DaysOld(someDate *time.Time) int {
 	days := time.Now().Sub(*someDate).Hours() / 24
 
 	return int(days)
+}
+
+
+func deleteKey(deleteKeys []types.AccessKeyMetadata, iamClient *iam.Client) error {
+	for _, v := range deleteKeys {
+		daki := &iam.DeleteAccessKeyInput{AccessKeyId: v.AccessKeyId}
+		_, err7 := iamClient.DeleteAccessKey(context.TODO(), daki)
+		if err7 != nil {
+			return fmt.Errorf("could not delete key %q; %v", *v.AccessKeyId, err7.Error())
+		}
+		log.Printf("removed key %v\n", *v.AccessKeyId)
+	}
+
+	return nil
+}
+
+// makeRoomForKey Deletes all IAM keys in the delete key list except for the current access ID in use.
+func makeRoomForKey(currentId string, deleteKeys []types.AccessKeyMetadata, iamClient *iam.Client) error {
+	for _, v := range deleteKeys {
+		// delete all keys marked for deletion, except the one we are using.
+		if *v.AccessKeyId != currentId {
+			daki := &iam.DeleteAccessKeyInput{AccessKeyId: v.AccessKeyId}
+			_, err7 := iamClient.DeleteAccessKey(context.TODO(), daki)
+			if err7 != nil {
+				return fmt.Errorf("could not delete key %q; %v", *v.AccessKeyId, err7.Error())
+			}
+			log.Printf("removed key %v\n", *v.AccessKeyId)
+		}
+	}
+
+	return nil
 }
