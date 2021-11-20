@@ -14,9 +14,9 @@ import (
 )
 
 type awsKeyPair struct {
-	Id string`json:"aws_access_key_id" csv:"User Name"`
-	Key string`json:"aws_secret_access_key" csv:"Access key ID"`
-	Username string`json:"username" csv:"Secret access key"`
+	Id       string `json:"aws_access_key_id" csv:"User Name"`
+	Key      string `json:"aws_secret_access_key" csv:"Access key ID"`
+	Username string `json:"username" csv:"Secret access key"`
 }
 
 func main() {
@@ -125,7 +125,7 @@ func main() {
 			mainErr = fmt.Errorf("problem with making a new access key: %v", err3.Error())
 		}
 
-		nk := awsKeyPair{ *newKey.AccessKey.AccessKeyId, *newKey.AccessKey.SecretAccessKey, *newKey.AccessKey.UserName}
+		nk := awsKeyPair{*newKey.AccessKey.AccessKeyId, *newKey.AccessKey.SecretAccessKey, *newKey.AccessKey.UserName}
 
 		content, errj := json.Marshal(nk)
 		if errj != nil {

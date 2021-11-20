@@ -8,7 +8,7 @@ import (
 )
 
 // saveToLocalProfile Save the credentials to a local config file using the aws cli.
-func saveToLocalProfile(creds  *iam.CreateAccessKeyOutput) error {
+func saveToLocalProfile(creds *iam.CreateAccessKeyOutput) error {
 	awsProfile := os.Getenv("AWS_PROFILE")
 	err1 := runCmd("aws", "configure", "set", "aws_access_key_id", *creds.AccessKey.AccessKeyId, "--profile", awsProfile)
 	if err1 != nil {

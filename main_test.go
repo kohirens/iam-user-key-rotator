@@ -6,11 +6,11 @@ import (
 )
 
 func TestDaysOld(tester *testing.T) {
-	cases := []struct{
+	cases := []struct {
 		name string
-		fix time.Time
+		fix  time.Time
 	}{
-		{"10days", time.Now().AddDate(0, 0, -10) },
+		{"10days", time.Now().AddDate(0, 0, -10)},
 	}
 
 	for _, test := range cases {
