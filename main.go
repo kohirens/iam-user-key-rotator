@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -19,15 +20,15 @@ type awsKeyPair struct {
 	Username string `json:"username" csv:"Secret access key"`
 }
 
+func init() {
+	//defineFlags()
+	appFlags.define()
+}
+
 func main() {
 	var mainErr error
-
 	var validKeys []types.AccessKeyMetadata
-	maxDaysAllowed := 30
 	var deleteKeys []types.AccessKeyMetadata
-	maxKeysAllowed := 1
-	region := "us-east-2"
-	filename := "new-aws-access-key.json"
 
 	defer func() {
 		if mainErr != nil {
@@ -36,6 +37,19 @@ func main() {
 		os.Exit(0)
 	}()
 
+	flag.Parse()
+	if err := appFlags.check(); err != nil {
+		mainErr = err
+		return
+	}
+
+	// TODO: Turn these vars into flags.
+	maxDaysAllowed := *appFlags.maxDaysAllowed
+	maxKeysAllowed := *appFlags.maxKeysAllowed
+	region := *appFlags.region
+	filename := *appFlags.filename //"new-aws-access-key.json"
+
+	return
 	// 1. Make a new AWS config to load the Shared AWS Configuration (such as ~/.aws/config)
 	awsConfig, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
 	if err != nil {
@@ -155,7 +169,6 @@ func DaysOld(someDate *time.Time) int {
 
 	return int(days)
 }
-
 
 func deleteKey(deleteKeys []types.AccessKeyMetadata, iamClient *iam.Client) error {
 	for _, v := range deleteKeys {
