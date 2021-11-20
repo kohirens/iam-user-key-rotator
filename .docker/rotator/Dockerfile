@@ -58,6 +58,7 @@ RUN mkdir -p ~/bin
 
 # Install Go helpful dev tools.
 RUN go install github.com/git-chglog/git-chglog/cmd/git-chglog@v0.15.0 \
+ && go install golang.org/x/tools/gopls@latest \
  && go clean -cache -modcache -testcache
 
 COPY .devcontainer/download-vs-code-server.sh .
