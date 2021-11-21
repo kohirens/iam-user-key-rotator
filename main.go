@@ -34,6 +34,7 @@ func main() {
 		if mainErr != nil {
 			log.Fatal(mainErr)
 		}
+		log.Println("exiting without error")
 		os.Exit(0)
 	}()
 
