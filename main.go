@@ -48,7 +48,8 @@ func main() {
 	maxDaysAllowed := *appFlags.maxDaysAllowed
 	maxKeysAllowed := *appFlags.maxKeysAllowed
 	region := *appFlags.region
-	filename := *appFlags.filename //"new-aws-access-key.json"
+	filename := *appFlags.filename
+	profile := *appFlags.profile
 
 	return
 	// 1. Make a new AWS config to load the Shared AWS Configuration (such as ~/.aws/config)

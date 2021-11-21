@@ -9,8 +9,9 @@ import (
 type applicationFlags struct {
 	maxDaysAllowed *int
 	maxKeysAllowed *int
-	region         *string
-	filename       *string
+	region,
+	filename,
+	profile *string
 }
 
 // appFlags Is the implementation of the applicationFlags type which you use at runtime.
@@ -22,6 +23,7 @@ func (af *applicationFlags) define() {
 	appFlags.maxKeysAllowed = flag.Int("maxKeysAllowed", 1, flagUsages["maxKeysAllowed"])
 	appFlags.region = flag.String("region", "", flagUsages["region"])
 	appFlags.filename = flag.String("filename", "new-aws-access-key.json", flagUsages["filename"])
+	appFlags.profile = flag.String("profile", "", flagUsages["profile"])
 }
 
 // check Verify that all flags are set appropriately.
