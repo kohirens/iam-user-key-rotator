@@ -24,6 +24,7 @@ const (
 func TestMain(m *testing.M) {
 	// Only runs when this environment variable is set.
 	if _, ok := os.LookupEnv(subCmdFlags); ok {
+		// See: https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/endpoints/
 		localStackResolver = aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
 			return aws.Endpoint{
 				PartitionID:   "aws",

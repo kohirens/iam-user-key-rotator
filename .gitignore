@@ -6,5 +6,6 @@
 
 # Files
 # -----
+/testdata/access-key-secret-auto-roto.json
 iam-user-key-rotator.exe
 new-aws-access*.csv

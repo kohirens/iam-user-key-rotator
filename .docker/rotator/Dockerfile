@@ -27,6 +27,7 @@ RUN apk --no-progress --purge --no-cache upgrade \
     expect \
     git \
     gnupg \
+    jq \
     libgcc \
     libstdc++ \
     openssh \
@@ -62,7 +63,6 @@ RUN go install github.com/git-chglog/git-chglog/cmd/git-chglog@v0.15.0 \
  && go clean -cache -modcache -testcache
 
 COPY .devcontainer/download-vs-code-server.sh .
-COPY .docker/rotator/start.sh /usr/local/bin/start.sh
 
 # Install VS Code Server and Requirements for pre-installing extensions
 RUN ./download-vs-code-server.sh \
@@ -76,7 +76,9 @@ WORKDIR "/home/${USER_NAME}/src/${REPO}"
 COPY --chown=app:app_users ./go.* ./
 COPY --chown=app:app_users ./*.go ./
 
-RUN pwd && ls -la && go mod tidy
+RUN go mod tidy
+
+COPY .docker/rotator/start.sh /usr/local/bin/start.sh
 
 ENTRYPOINT [ "sh" ]
 

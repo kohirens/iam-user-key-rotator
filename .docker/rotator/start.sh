@@ -17,6 +17,30 @@ trap 'shutd' SIGTERM
 
 echo "Starting up..."
 
+end=0
+
+printf "waiting for a file to show up"
+while [ $end -lt 10 ]; do
+    printf "."
+    end=$((end+1))
+    sleep 1
+    :
+done
+echo "done"
+
+iamCredsFile="/home/app/src/github.com/kohirens/iam-user-key-rotator/testdata/access-key-secret-auto-roto.json"
+
+if [ -f "${iamCredsFile}" ]; then
+  printf "Generating an AWS credentials file from localstack IAM credentials..."
+  id=$(cat ${iamCredsFile} | jq -r .AccessKey.AccessKeyId)
+  secret=`cat ${iamCredsFile} | jq -r .AccessKey.SecretAccessKey`
+
+  mkdir -p ~/.aws/
+  echo "aws_access_key_id = ${id}" > ~/.aws/credentials
+  echo "aws_secret_access_key = ${secret}" >> ~/.aws/credentials
+  echo "done"
+fi
+
 # Run non-blocking commands here
 go mod tidy
 go mod vendor

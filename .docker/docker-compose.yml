@@ -2,6 +2,8 @@ version: '3.8'
 
 services:
     rotate:
+        depends_on:
+            - localstack
         build:
             args:
                 USER_NAME: '${USER_NAME}'
@@ -39,10 +41,12 @@ services:
             - "localstack:/tmp/localstack"
             - "/var/run/docker.sock:/var/run/docker.sock"
             - './local-stack/init-aws.sh:/docker-entrypoint-initaws.d/init-aws.sh'
-            - '../tmp:/test-tmp'
+            - '../testdata:/test-tmp'
 
 # alias laws='aws --endpoint-url=http://localstack:4566'
     awscli:
+        depends_on:
+            - localstack
         build:
             args:
                 USER_NAME: '${USER_NAME}'
