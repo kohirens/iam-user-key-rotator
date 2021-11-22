@@ -17,8 +17,8 @@ trap 'shutd' SIGTERM
 
 echo "Starting up..."
 
+# Guess how much time localstack needs before generating the IAM creds.
 end=0
-
 printf "waiting for a file to show up"
 while [ $end -lt 10 ]; do
     printf "."
