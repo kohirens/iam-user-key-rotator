@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
@@ -24,6 +25,8 @@ func init() {
 	//defineFlags()
 	appFlags.define()
 }
+
+var localStackResolver aws.EndpointResolverFunc
 
 func main() {
 	var mainErr error
@@ -51,9 +54,18 @@ func main() {
 	filename := *appFlags.filename
 	profile := *appFlags.profile
 
-	return
-	// 1. Make a new AWS config to load the Shared AWS Configuration (such as ~/.aws/config)
-	awsConfig, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+	// Make a new AWS config to load the Shared AWS Configuration (such as ~/.aws/config).
+	var awsConfig aws.Config
+	var err error
+
+	if localStackResolver != nil {
+		// TODO: : Find a better way to allow this to be tested.
+		// Adding this code to allows unit testing using localstack.
+		log.Println("using localstack")
+		awsConfig, err = config.LoadDefaultConfig(context.TODO(), config.WithRegion(region), config.WithSharedConfigProfile(profile), config.WithEndpointResolver(localStackResolver))
+	} else {
+		awsConfig, err = config.LoadDefaultConfig(context.TODO(), config.WithRegion(region), config.WithSharedConfigProfile(profile))
+	}
 	if err != nil {
 		mainErr = fmt.Errorf("could not get AWS configuration with default methods; %v", err.Error())
 		return
@@ -63,7 +75,8 @@ func main() {
 
 	creds, err6 := awsConfig.Credentials.Retrieve(context.TODO())
 	if err6 != nil {
-		mainErr = fmt.Errorf("could not get current AWS key ID; %v", err.Error())
+		mainErr = fmt.Errorf("could not get current AWS key ID; %v", err6.Error())
+		return
 	}
 
 	currentId := creds.AccessKeyID

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"log"
 	"os"
 	"os/exec"
@@ -23,6 +24,13 @@ const (
 func TestMain(m *testing.M) {
 	// Only runs when this environment variable is set.
 	if _, ok := os.LookupEnv(subCmdFlags); ok {
+		localStackResolver = aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+			return aws.Endpoint{
+				PartitionID:   "aws",
+				URL:           "http://localstack:4566",
+				SigningRegion: region,
+			}, nil
+		})
 		runAppMain()
 	}
 
@@ -62,6 +70,7 @@ func TestFlags(tester *testing.T) {
 		args     []string
 	}{
 		{"noFlags", 1, []string{}},
+		{"withRegion", 0, []string{"-region", "us-east-2"}},
 	}
 
 	for _, test := range tests {
