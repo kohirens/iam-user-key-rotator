@@ -36,8 +36,9 @@ if [ -f "${iamCredsFile}" ]; then
   secret=`cat ${iamCredsFile} | jq -r .AccessKey.SecretAccessKey`
 
   mkdir -p ~/.aws/
-  echo "aws_access_key_id = ${id}" > ~/.aws/credentials
-  echo "aws_secret_access_key = ${secret}" >> ~/.aws/credentials
+  echo "[default]" > ~/.aws/config
+  echo "aws_access_key_id = ${id}" >> ~/.aws/config
+  echo "aws_secret_access_key = ${secret}" >> ~/.aws/config
   echo "done"
 fi
 
