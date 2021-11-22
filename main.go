@@ -22,7 +22,6 @@ type awsKeyPair struct {
 }
 
 func init() {
-	//defineFlags()
 	appFlags.define()
 }
 
@@ -37,17 +36,18 @@ func main() {
 		if mainErr != nil {
 			log.Fatal(mainErr)
 		}
-		log.Println("exiting without error")
+
+		log.Println("exiting with code 0")
 		os.Exit(0)
 	}()
 
 	flag.Parse()
+
 	if err := appFlags.check(); err != nil {
 		mainErr = err
 		return
 	}
 
-	// TODO: Turn these vars into flags.
 	maxDaysAllowed := *appFlags.maxDaysAllowed
 	maxKeysAllowed := *appFlags.maxKeysAllowed
 	region := *appFlags.region
@@ -71,8 +71,7 @@ func main() {
 		return
 	}
 
-	// get current access key id:
-
+	// Get current access key id.
 	creds, err6 := awsConfig.Credentials.Retrieve(context.TODO())
 	if err6 != nil {
 		mainErr = fmt.Errorf("could not get current AWS key ID; %v", err6.Error())
@@ -81,10 +80,11 @@ func main() {
 
 	currentId := creds.AccessKeyID
 
-	// 1.5 New IAM client
+	log.Printf("Region/IAM user : %v/%v\n", awsConfig.Region, currentId)
+	// Init a new IAM client.
 	iamClient := iam.NewFromConfig(awsConfig)
 
-	// 2. Load AWS IAM Credentials.
+	// Load AWS IAM Credentials.
 	liko, err2 := iamClient.ListAccessKeys(context.TODO(), &iam.ListAccessKeysInput{})
 	if err2 != nil {
 		mainErr = err2
@@ -93,7 +93,7 @@ func main() {
 
 	numKeys := len(liko.AccessKeyMetadata)
 
-	// 3. Read IAM user keys.
+	// Read IAM user keys.
 	// TODO: refactor as func getIamKeys
 	for i, v := range liko.AccessKeyMetadata {
 		// Calculate how many days old the key is.

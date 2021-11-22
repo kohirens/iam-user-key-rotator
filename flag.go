@@ -5,20 +5,23 @@ import (
 	"fmt"
 )
 
-// This is the struct that defines all of application flags.
+// This is the struct that defines all application flags.
 type applicationFlags struct {
-	maxDaysAllowed *int
+	maxDaysAllowed,
 	maxKeysAllowed *int
 	region,
 	filename,
 	profile *string
 }
 
-// appFlags Is the implementation of the applicationFlags type which you use at runtime.
+// appFlags Is what you use at runtime, it is the implementation of the applicationFlags type.
 var appFlags = new(applicationFlags)
 
 // defineFlags Define all application flags.
 func (af *applicationFlags) define() {
+	// NOTE: This code is redundant, but if we try to dry it out then it could get overly complicated and ruin the
+	// simplicity. Though I do like the idea of only adding a new field to the applicationFlags and automating lines
+	// added here.
 	appFlags.maxDaysAllowed = flag.Int("maxDaysAllowed", 30, flagUsages["maxDaysAllowed"])
 	appFlags.maxKeysAllowed = flag.Int("maxKeysAllowed", 1, flagUsages["maxKeysAllowed"])
 	appFlags.region = flag.String("region", "", flagUsages["region"])
