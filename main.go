@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"time"
 )
@@ -163,7 +164,23 @@ func main() {
 			return
 		}
 
-		saveToLocalProfile(newKey)
+		hClient := &http.Client{}
+
+		saveMode := ""
+		var saveErr error
+		switch saveMode {
+		case "circleci":
+			saveErr = updateCircleCIContextVar("", "", "", hClient)
+
+		default:
+			saveErr = saveToLocalProfile(newKey)
+		}
+
+		if saveErr != nil {
+			mainErr = saveErr
+			return
+		}
+
 		log.Println("new key saved to local profile")
 	}
 
