@@ -32,6 +32,7 @@ func TestMain(m *testing.M) {
 				SigningRegion: region,
 			}, nil
 		})
+		hClient = &mockHttpClient{0}
 		runAppMain()
 	}
 
@@ -72,6 +73,7 @@ func TestFlags(tester *testing.T) {
 	}{
 		{"noFlags", 1, []string{}},
 		{"withRegion", 0, []string{"-region", "us-east-2"}},
+		{"withCircleSuccess", 0, []string{"-region", "us-east-2", "--circleci", "1234"}},
 	}
 
 	for _, test := range tests {
