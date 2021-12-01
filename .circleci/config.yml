@@ -1,0 +1,43 @@
+version: 2.1
+
+jobs:
+  co:
+    working_directory: ~/repo
+    docker:
+      - image: circleci/golang:1.16.
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-v1-{{ checksum "go.sum" }}
+      - run:
+          name: Install Dependencies
+          command: go mod tidy
+      - save_cache:
+          key: go-mod-v1-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
+      - persist_to_workspace:
+          root: .
+          paths: [./* ]
+  rotate-iam-key:
+    docker:
+      - image: kohirens/iam-user-key-rotator:0.1.0
+        auth:
+          username: ${DH_USER}
+          password: ${DH_PASS}
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: 'IAM key/pair rotator'
+          command: |
+            './iam-user-key-rotator --circleci ${CIRCLE_TOKEN}'
+
+workflows:
+  pull-request:
+    jobs:
+      - co
+      - rotate-iam-key:
+          requires: [ co ]
+          context: orb-publishing
