@@ -4,7 +4,7 @@ jobs:
   co:
     working_directory: ~/repo
     docker:
-      - image: circleci/golang:1.16.
+      - image: circleci/golang:1.17
     steps:
       - checkout
       - restore_cache:
@@ -17,12 +17,17 @@ jobs:
           key: go-mod-v1-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
+      - run:
+          name: Run tests
+          command: |
+            mkdir -p /tmp/test-reports
+            gotestsum --junitfile /tmp/test-reports/unit-tests.xml
       - persist_to_workspace:
           root: .
           paths: [./* ]
   rotate-iam-key:
     docker:
-      - image: kohirens/iam-user-key-rotator:0.1.0
+      - image: circleci/golang:1.17
         auth:
           username: ${DH_USER}
           password: ${DH_PASS}

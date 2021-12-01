@@ -8,4 +8,5 @@ var flagUsages = map[string]string{
 	"maxKeysAllowed": "[maxKeysAllowed] int\n\tAn integer representing the maximum number of keys that should exist on an IAM user.",
 	"filename":       "[filename] string\n\tPath of a file to store a new IAM key/secret pair.",
 	"region":         "<region> string\n\tAn AWS region.",
+	"circleci":       "[circleci] string\n\tCircle CI personal token used to update context variables.",
 }
