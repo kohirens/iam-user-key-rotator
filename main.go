@@ -27,6 +27,7 @@ func init() {
 }
 
 var localStackResolver aws.EndpointResolverFunc
+var hClient *http.Client
 
 func main() {
 	var mainErr error
@@ -164,22 +165,31 @@ func main() {
 			return
 		}
 
-		hClient := &http.Client{}
+		if hClient == nil {
+			hClient = &http.Client{}
+		}
 
 		saveMode := ""
-		var saveErr error
+
 		switch saveMode {
 		case "circleci":
-			saveErr = updateCircleCIContextVar("", "", "", hClient)
-
+			cciToken := os.Getenv("CIRCLECI_TOKEN")
+			if err := updateCircleCIContextVar("AWS_ACCESS_KEY_ID", *newKey.AccessKey.AccessKeyId, cciToken, hClient) ; err != nil {
+				mainErr = err
+				return
+			}
+			if err := updateCircleCIContextVar("AWS_SECRET_ACCESS_KEY", *newKey.AccessKey.SecretAccessKey, cciToken, hClient) ; err != nil {
+				mainErr = err
+				return
+			}
 		default:
-			saveErr = saveToLocalProfile(newKey)
+			saveErr := saveToLocalProfile(newKey)
+			if saveErr != nil {
+				mainErr = saveErr
+				return
+			}
 		}
 
-		if saveErr != nil {
-			mainErr = saveErr
-			return
-		}
 
 		log.Println("new key saved to local profile")
 	}
