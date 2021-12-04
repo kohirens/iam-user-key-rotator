@@ -26,8 +26,8 @@ func init() {
 	appFlags.define()
 }
 
-var localStackResolver aws.EndpointResolverFunc
 var hClient httpCommunicator
+var optFns []func(*config.LoadOptions) error
 
 func main() {
 	var mainErr error
@@ -52,23 +52,11 @@ func main() {
 
 	maxDaysAllowed := *appFlags.maxDaysAllowed
 	maxKeysAllowed := *appFlags.maxKeysAllowed
-	region := *appFlags.region
 	filename := *appFlags.filename
-	profile := *appFlags.profile
 	cciToken := *appFlags.circleci
 
 	// Make a new AWS config to load the Shared AWS Configuration (such as ~/.aws/config).
-	var awsConfig aws.Config
-	var err0 error
-
-	if localStackResolver != nil {
-		// TODO: : Find a better way to allow this to be tested.
-		// Adding this code to allows unit testing using localstack.
-		log.Println("using localstack")
-		awsConfig, err0 = config.LoadDefaultConfig(context.TODO(), config.WithRegion(region), config.WithSharedConfigProfile(profile), config.WithEndpointResolver(localStackResolver))
-	} else {
-		awsConfig, err0 = config.LoadDefaultConfig(context.TODO(), config.WithRegion(region), config.WithSharedConfigProfile(profile))
-	}
+	awsConfig, err0 := getAwsConfig(appFlags)
 	if err0 != nil {
 		mainErr = fmt.Errorf("could not get AWS configuration with default methods; %v", err0.Error())
 		return
@@ -177,11 +165,11 @@ func main() {
 
 		switch saveMode {
 		case "circleci":
-			if err := updateCircleCIContextVar("AWS_ACCESS_KEY_ID", *newKey.AccessKey.AccessKeyId, cciToken, hClient) ; err != nil {
+			if err := updateCircleCIContextVar("AWS_ACCESS_KEY_ID", *newKey.AccessKey.AccessKeyId, cciToken, hClient); err != nil {
 				mainErr = err
 				return
 			}
-			if err := updateCircleCIContextVar("AWS_SECRET_ACCESS_KEY", *newKey.AccessKey.SecretAccessKey, cciToken, hClient) ; err != nil {
+			if err := updateCircleCIContextVar("AWS_SECRET_ACCESS_KEY", *newKey.AccessKey.SecretAccessKey, cciToken, hClient); err != nil {
 				mainErr = err
 				return
 			}
@@ -192,7 +180,6 @@ func main() {
 				return
 			}
 		}
-
 
 		log.Println("new key saved to local profile")
 	}
@@ -226,6 +213,16 @@ func deleteKey(deleteKeys []types.AccessKeyMetadata, iamClient *iam.Client) erro
 	}
 
 	return nil
+}
+
+// getAwsConfig Get an AWS Config, with o+ptional overrides.
+func getAwsConfig(ac *applicationFlags) (aws.Config, error) {
+	if optFns != nil {
+		optFns[0] = config.WithRegion(*ac.region)
+		optFns[1] = config.WithSharedConfigProfile(*ac.profile)
+	}
+
+	return config.LoadDefaultConfig(context.TODO(), optFns...)
 }
 
 // makeRoomForKey Deletes all IAM keys in the delete key list except for the current access ID in use.
