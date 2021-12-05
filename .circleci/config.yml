@@ -42,7 +42,8 @@ jobs:
 workflows:
   pull-request:
     jobs:
-      - co
+      - co:
+          context: [ testing ]
       - rotate-iam-key:
           requires: [ co ]
-          context: orb-publishing
+          context: [ orb-publishing, testing ]
