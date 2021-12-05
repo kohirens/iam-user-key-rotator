@@ -28,7 +28,7 @@ func (af *applicationFlags) define() {
 	appFlags.region = flag.String("region", "", flagUsages["region"])
 	appFlags.filename = flag.String("filename", "new-aws-access-key.json", flagUsages["filename"])
 	appFlags.profile = flag.String("profile", "", flagUsages["profile"])
-	appFlags.profile = flag.String("circleci", "", flagUsages["circleci"])
+	appFlags.circleci = flag.String("circleci", "", flagUsages["circleci"])
 }
 
 // check Verify that all flags are set appropriately.

@@ -22,9 +22,6 @@ const (
 	dirMode     = 0700
 )
 
-// awsConfigOpts shorthand to set an array of config.LoadOptionsFunc to override defaults
-type awsConfigOpts []func(*config.LoadOptions) error
-
 func TestMain(m *testing.M) {
 	// Only runs when this environment variable is set. Allows testing the main program in a sub process.
 	if _, ok := os.LookupEnv(subCmdFlags); ok {
