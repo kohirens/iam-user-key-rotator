@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -26,19 +28,26 @@ func TestMain(m *testing.M) {
 	// Only runs when this environment variable is set. Allows testing the main program in a sub process.
 	if _, ok := os.LookupEnv(subCmdFlags); ok {
 		// Adding this code to allow unit testing using localstack.
-		optFns = awsConfigOpts{
-			config.WithRegion(""),
-			config.WithSharedConfigProfile(""),
-			config.WithEndpointResolver(aws.EndpointResolverFunc(
-				// See: https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/endpoints/
-				func(service, region string) (aws.Endpoint, error) {
-					return aws.Endpoint{
-						PartitionID:   "aws",
-						URL:           "http://localstack:4566",
-						SigningRegion: region,
-					}, nil
-				},
-			)),
+		res, err := http.Get("http://localstack:4566")
+		if err == nil {
+			b, e := io.ReadAll(res.Body)
+			if (e == nil || e == io.EOF) && string(b) == "{\"status\": \"running\"}" {
+				log.Println("using localstack for AWS endpoint")
+				optFns = awsConfigOpts{
+					config.WithRegion(""),
+					config.WithSharedConfigProfile(""),
+					config.WithEndpointResolver(aws.EndpointResolverFunc(
+						// See: https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/endpoints/
+						func(service, region string) (aws.Endpoint, error) {
+							return aws.Endpoint{
+								PartitionID:   "aws",
+								URL:           "http://localstack:4566",
+								SigningRegion: region,
+							}, nil
+						},
+					)),
+				}
+			}
 		}
 		// mock HTTP client to spy and assert.
 		hClient = &mockHttpClient{0}
