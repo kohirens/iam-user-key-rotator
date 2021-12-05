@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -28,6 +29,19 @@ func updateCircleCIContextVar(name, val, token string, client httpCommunicator) 
 
 	if res.StatusCode != 200 {
 		return fmt.Errorf(errors.updateCiContextErr, string(body))
+	}
+
+	return nil
+}
+
+// saveToCircleContext
+func saveToCircleContext(creds *iam.CreateAccessKeyOutput, cciToken string) error {
+	if err := updateCircleCIContextVar(keyVarName, *creds.AccessKey.AccessKeyId, cciToken, hClient); err != nil {
+		return err
+	}
+
+	if err := updateCircleCIContextVar(secretVarName, *creds.AccessKey.SecretAccessKey, cciToken, hClient); err != nil {
+		return err
 	}
 
 	return nil

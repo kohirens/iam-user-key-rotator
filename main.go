@@ -16,11 +16,17 @@ import (
 	"time"
 )
 
+const keyVarName = "AWS_ACCESS_KEY_ID"
+const secretVarName = "AWS_SECRET_ACCESS_KEY"
+
 type awsKeyPair struct {
 	Id       string `json:"aws_access_key_id" csv:"User Name"`
 	Key      string `json:"aws_secret_access_key" csv:"Access key ID"`
 	Username string `json:"username" csv:"Secret access key"`
 }
+
+// awsConfigOpts shorthand to set an array of config.LoadOptionsFunc to override defaults
+type awsConfigOpts []func(*config.LoadOptions) error
 
 func init() {
 	appFlags.define()
@@ -53,7 +59,6 @@ func main() {
 	maxDaysAllowed := *appFlags.maxDaysAllowed
 	maxKeysAllowed := *appFlags.maxKeysAllowed
 	filename := *appFlags.filename
-	cciToken := *appFlags.circleci
 
 	// Make a new AWS config to load the Shared AWS Configuration (such as ~/.aws/config).
 	awsConfig, err0 := getAwsConfig(appFlags)
@@ -86,19 +91,20 @@ func main() {
 
 	// Read IAM user keys.
 	// TODO: refactor as func getIamKeys
-	for i, v := range liko.AccessKeyMetadata {
+	log.Println("key id               | status | username | days old | date")
+	for _, v := range liko.AccessKeyMetadata {
 		// Calculate how many days old the key is.
 		daysOld := DaysOld(v.CreateDate)
-		log.Printf("%d. id: %s, status: %v, username: %s, date: %v, days: %v\n", i+1, *v.AccessKeyId, v.Status, *v.UserName, v.CreateDate, daysOld)
+		log.Printf("%s | %v | %s | %v | %v\n", *v.AccessKeyId, v.Status, *v.UserName, daysOld, v.CreateDate)
 
-		//5. If older than maxDaysAllowed, then rotate the key.
+		// When older than maxDaysAllowed, then rotate the key.
 		if daysOld > maxDaysAllowed && numKeys > maxKeysAllowed {
 			log.Printf("will delete key: %v", *v.AccessKeyId)
 			deleteKeys = append(deleteKeys, v)
 			continue
 		}
 
-		// 5. If less than 30 days, then do nothing.
+		// When less than 30 days, then do nothing.
 		validKeys = append(validKeys, v)
 	}
 
@@ -158,30 +164,10 @@ func main() {
 			hClient = &http.Client{}
 		}
 
-		saveMode := ""
-		if *(appFlags.circleci) != "" {
-			saveMode = "circleci"
+		if err := save(newKey, appFlags); err != nil {
+			mainErr = err
+			return
 		}
-
-		switch saveMode {
-		case "circleci":
-			if err := updateCircleCIContextVar("AWS_ACCESS_KEY_ID", *newKey.AccessKey.AccessKeyId, cciToken, hClient); err != nil {
-				mainErr = err
-				return
-			}
-			if err := updateCircleCIContextVar("AWS_SECRET_ACCESS_KEY", *newKey.AccessKey.SecretAccessKey, cciToken, hClient); err != nil {
-				mainErr = err
-				return
-			}
-		default:
-			saveErr := saveToLocalProfile(newKey)
-			if saveErr != nil {
-				mainErr = saveErr
-				return
-			}
-		}
-
-		log.Println("new key saved to local profile")
 	}
 
 	// Delete any remaining keys (which should only be the current key if any).
@@ -215,11 +201,13 @@ func deleteKey(deleteKeys []types.AccessKeyMetadata, iamClient *iam.Client) erro
 	return nil
 }
 
-// getAwsConfig Get an AWS Config, with o+ptional overrides.
+// getAwsConfig Get an AWS Config, with optional overrides.
 func getAwsConfig(ac *applicationFlags) (aws.Config, error) {
-	if optFns != nil {
-		optFns[0] = config.WithRegion(*ac.region)
-		optFns[1] = config.WithSharedConfigProfile(*ac.profile)
+	if optFns == nil {
+		optFns = awsConfigOpts{
+			config.WithRegion(*ac.region),
+			config.WithSharedConfigProfile(*ac.profile),
+		}
 	}
 
 	return config.LoadDefaultConfig(context.TODO(), optFns...)
@@ -240,4 +228,21 @@ func makeRoomForKey(currentId string, deleteKeys []types.AccessKeyMetadata, iamC
 	}
 
 	return nil
+}
+
+// save AWS credentials to a medium.
+func save(creds *iam.CreateAccessKeyOutput, ac *applicationFlags) error {
+	saveMode := ""
+	if *(appFlags.circleci) != "" {
+		saveMode = "circleci"
+	}
+
+	switch saveMode {
+	case "circleci":
+		log.Println("saving to Circle CI context")
+		return saveToCircleContext(creds, *ac.circleci)
+	default:
+		log.Println("saving to local credentials/profile")
+		return saveToLocalProfile(creds)
+	}
 }
