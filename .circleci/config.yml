@@ -1,5 +1,8 @@
 version: 2.1
 
+attach: &attach
+  - attach_workspace:
+      at: .
 jobs:
   co:
     working_directory: ~/repo
@@ -17,6 +20,19 @@ jobs:
           key: go-mod-v1-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
+      - persist_to_workspace:
+          root: .
+          paths: [./* ]
+  test:
+    working_directory: ~/repo
+    docker:
+      - image: circleci/golang:1.17
+    steps:
+      - attach_workspace:
+          at: .
+      - restore_cache:
+          keys:
+            - go-mod-v1-{{ checksum "go.sum" }}
       - run:
           name: Run tests
           command: |
@@ -25,10 +41,7 @@ jobs:
       - store_artifacts:
           path: /tmp/test-reports
           destination: artifact-file
-      - persist_to_workspace:
-          root: .
-          paths: [./* ]
-  rotate-iam-key:
+  check-iam-key:
     docker:
       - image: circleci/golang:1.17
         auth:
@@ -37,17 +50,22 @@ jobs:
     steps:
       - attach_workspace:
           at: .
+      - restore_cache:
+          keys:
+            - go-mod-v1-{{ checksum "go.sum" }}
       - run:
           name: 'IAM key/pair rotator'
           command: |
             go build
-            ./iam-user-key-rotator --circleci "${CIRCLE_TOKEN}"
+            ./iam-user-key-rotator --region "us-east-2" --circleci "${CIRCLE_TOKEN}"
 
 workflows:
   wip:
     jobs:
-      - co:
+      - co
+      - test:
+          requires: [ co ]
           context: [ testing ]
-      - rotate-iam-key:
+      - check-iam-key:
           requires: [ co ]
           context: [ orb-publishing, testing ]
