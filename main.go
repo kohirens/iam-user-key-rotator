@@ -25,6 +25,18 @@ type awsKeyPair struct {
 	Username string `json:"username" csv:"Secret access key"`
 }
 
+type iamStats struct {
+	current    string
+	keys       []iamKeyInfo
+	old, valid []*iamKeyInfo
+}
+
+type iamKeyInfo struct {
+	*types.AccessKeyMetadata
+	Days    int
+	Expired bool
+}
+
 // awsConfigOpts shorthand to set an array of config.LoadOptionsFunc to override defaults
 type awsConfigOpts []func(*config.LoadOptions) error
 
@@ -84,43 +96,21 @@ func main() {
 		return
 	}
 
-	validKeys, deleteKeys := getKeyInfo(liko.AccessKeyMetadata, maxDaysAllowed, maxKeysAllowed)
-	numKeys := len(liko.AccessKeyMetadata)
-
-	// Read IAM user keys.
-	// TODO: refactor as func getIamKeys
-	//log.Println("key id               | status | username | days old | date")
-	//for _, v := range liko.AccessKeyMetadata {
-	//	// Calculate how many days old the key is.
-	//	daysOld := DaysOld(v.CreateDate)
-	//	log.Printf("%s | %v | %s | %v | %v\n", *v.AccessKeyId, v.Status, *v.UserName, daysOld, v.CreateDate)
-	//
-	//	// When older than maxDaysAllowed, then mark for deletion.
-	//	if daysOld > maxDaysAllowed && numKeys > maxKeysAllowed {
-	//		log.Printf("will delete key: %v", *v.AccessKeyId)
-	//		deleteKeys = append(deleteKeys, v)
-	//		continue
-	//	}
-	//
-	//	// When less than 30 days, then do nothing.
-	//	validKeys = append(validKeys, v)
-	//}
-
-	log.Printf("number of keys %v", numKeys)
-	log.Printf("\t%v are valid keys", len(validKeys))
-	log.Printf("\t%v will be removed", len(deleteKeys))
+	// Determine which keys are older than days allowed
+	iamKeyStats := getIamKeyStats(liko.AccessKeyMetadata, maxDaysAllowed, creds.AccessKeyID)
+	displayIamStats(iamKeyStats)
 
 	// make sure there is room to make a new key.
-	if errX := makeRoomForKey(currentId, deleteKeys, iamClient); errX != nil {
+	if errX := makeRoomForKey(currentId, iamKeyStats.old, iamClient); errX != nil {
 		mainErr = errX
 		return
 	}
 
 	// TODO: Extract as func validKeys
-	numValidKeys := len(validKeys)
+	numValidKeys := len(iamKeyStats.valid)
 	if numValidKeys > maxKeysAllowed {
 		// delete keys that we are not using, until we get to the max allowed.
-		for _, v := range validKeys {
+		for _, v := range iamKeyStats.valid {
 			if *v.AccessKeyId != currentId {
 				daki := &iam.DeleteAccessKeyInput{AccessKeyId: v.AccessKeyId}
 				_, err7 := iamClient.DeleteAccessKey(context.TODO(), daki)
@@ -169,7 +159,7 @@ func main() {
 	}
 
 	// Delete any remaining keys (which should only be the current key if any).
-	for _, v := range deleteKeys {
+	for _, v := range iamKeyStats.old {
 		daki := &iam.DeleteAccessKeyInput{AccessKeyId: v.AccessKeyId}
 		_, err7 := iamClient.DeleteAccessKey(context.TODO(), daki)
 		if err7 != nil {
@@ -212,7 +202,7 @@ func getAwsConfig(ac *applicationFlags) (aws.Config, error) {
 }
 
 // makeRoomForKey Deletes all IAM keys in the delete key list except for the current access ID in use.
-func makeRoomForKey(currentId string, deleteKeys []types.AccessKeyMetadata, iamClient *iam.Client) error {
+func makeRoomForKey(currentId string, deleteKeys []*iamKeyInfo, iamClient *iam.Client) error {
 	for _, v := range deleteKeys {
 		// delete all keys marked for deletion, except the one we are using.
 		if *v.AccessKeyId != currentId {
@@ -245,29 +235,52 @@ func save(creds *iam.CreateAccessKeyOutput, ac *applicationFlags, hc httpCommuni
 	}
 }
 
-func getKeyInfo(ak []types.AccessKeyMetadata, daysAllowed, keysAllowed int) ([]types.AccessKeyMetadata, []types.AccessKeyMetadata) {
-	var deleteKeys []types.AccessKeyMetadata
-	var validKeys []types.AccessKeyMetadata
+func newIamStats(c string) *iamStats {
+	stats := &iamStats{
+		current: c,
+		keys:    make([]iamKeyInfo, 0),
+		old:     make([]*iamKeyInfo, 0),
+		valid:   make([]*iamKeyInfo, 0),
+	}
+	return stats
+}
 
-	log.Println("key id               | status | username | days old | date")
-
-	numKeys := len(ak)
+func getIamKeyStats(ak []types.AccessKeyMetadata, daysAllowed int, currentId string) *iamStats {
+	stats := newIamStats(currentId)
 
 	for _, v := range ak {
-		// Calculate how many days old the key is.
 		daysOld := DaysOld(v.CreateDate)
-		log.Printf("%s | %v | %s | %v | %v\n", *v.AccessKeyId, v.Status, *v.UserName, daysOld, v.CreateDate)
+		k := iamKeyInfo{
+			&v,
+			daysOld,
+			daysOld > daysAllowed,
+		}
+		stats.keys = append(stats.keys, k)
 
-		// When older than maxDaysAllowed, then mark for deletion.
-		if daysOld > daysAllowed && numKeys > keysAllowed {
-			log.Printf("will delete key: %v", *v.AccessKeyId)
-			deleteKeys = append(deleteKeys, v)
+		// When older than daysAllowed, then mark for deletion.
+		if daysOld > daysAllowed {
+			stats.old = append(stats.old, &k)
 			continue
 		}
 
-		// When less than 30 days, then do nothing.
-		validKeys = append(validKeys, v)
+		// otherwise, its valid.
+		stats.valid = append(stats.old, &k)
 	}
 
-	return validKeys, deleteKeys
+	return stats
+}
+
+func displayIamStats(stats *iamStats) {
+	// Header
+	log.Println("key id               | status | username | days old | date")
+
+	for _, v := range stats.keys {
+		// Calculate how many days old the key is.
+		daysOld := DaysOld(v.CreateDate)
+		log.Printf("%s | %v | %s | %v | %v\n", *v.AccessKeyId, v.Status, *v.UserName, daysOld, v.CreateDate)
+	}
+
+	log.Printf("number of keys %v", len(stats.keys))
+	log.Printf("\t%v are valid keys", len(stats.valid))
+	log.Printf("\t%v will be removed", len(stats.old))
 }
