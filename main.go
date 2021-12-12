@@ -28,12 +28,12 @@ type awsKeyPair struct {
 // awsConfigOpts shorthand to set an array of config.LoadOptionsFunc to override defaults
 type awsConfigOpts []func(*config.LoadOptions) error
 
+var httpComm httpCommunicator
+var optFns []func(*config.LoadOptions) error
+
 func init() {
 	appFlags.define()
 }
-
-var hClient httpCommunicator
-var optFns []func(*config.LoadOptions) error
 
 func main() {
 	var mainErr error
@@ -76,11 +76,10 @@ func main() {
 
 	currentId := creds.AccessKeyID
 
-	log.Printf("Region/IAM user : %v/%v\n", awsConfig.Region, currentId)
 	// Init a new IAM client.
 	iamClient := iam.NewFromConfig(awsConfig)
 
-	// Load AWS IAM Credentials.
+	// Query IAM for any keys.
 	liko, err2 := iamClient.ListAccessKeys(context.TODO(), &iam.ListAccessKeysInput{})
 	if err2 != nil {
 		mainErr = err2
@@ -92,12 +91,13 @@ func main() {
 	// Read IAM user keys.
 	// TODO: refactor as func getIamKeys
 	log.Println("key id               | status | username | days old | date")
+	getKeyInfo()
 	for _, v := range liko.AccessKeyMetadata {
 		// Calculate how many days old the key is.
 		daysOld := DaysOld(v.CreateDate)
 		log.Printf("%s | %v | %s | %v | %v\n", *v.AccessKeyId, v.Status, *v.UserName, daysOld, v.CreateDate)
 
-		// When older than maxDaysAllowed, then rotate the key.
+		// When older than maxDaysAllowed, then mark for deletion.
 		if daysOld > maxDaysAllowed && numKeys > maxKeysAllowed {
 			log.Printf("will delete key: %v", *v.AccessKeyId)
 			deleteKeys = append(deleteKeys, v)
@@ -160,11 +160,11 @@ func main() {
 			return
 		}
 
-		if hClient == nil {
-			hClient = &http.Client{}
+		if httpComm == nil {
+			httpComm = &http.Client{}
 		}
 
-		if err := save(newKey, appFlags); err != nil {
+		if err := save(newKey, appFlags, httpComm); err != nil {
 			mainErr = err
 			return
 		}
@@ -231,7 +231,7 @@ func makeRoomForKey(currentId string, deleteKeys []types.AccessKeyMetadata, iamC
 }
 
 // save AWS credentials to a medium.
-func save(creds *iam.CreateAccessKeyOutput, ac *applicationFlags) error {
+func save(creds *iam.CreateAccessKeyOutput, ac *applicationFlags, hc httpCommunicator) error {
 	saveMode := ""
 	if *(appFlags.circleci) != "" {
 		saveMode = "circleci"
@@ -240,7 +240,7 @@ func save(creds *iam.CreateAccessKeyOutput, ac *applicationFlags) error {
 	switch saveMode {
 	case "circleci":
 		log.Println("saving to Circle CI context")
-		return saveToCircleContext(creds, *ac.circleci)
+		return saveToCircleContext(creds, *ac.circleci, hc)
 	default:
 		log.Println("saving to local credentials/profile")
 		return saveToLocalProfile(creds)
