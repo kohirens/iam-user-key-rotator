@@ -37,8 +37,6 @@ func init() {
 
 func main() {
 	var mainErr error
-	var validKeys []types.AccessKeyMetadata
-	var deleteKeys []types.AccessKeyMetadata
 
 	defer func() {
 		if mainErr != nil {
@@ -86,27 +84,27 @@ func main() {
 		return
 	}
 
+	validKeys, deleteKeys := getKeyInfo(liko.AccessKeyMetadata, maxDaysAllowed, maxKeysAllowed)
 	numKeys := len(liko.AccessKeyMetadata)
 
 	// Read IAM user keys.
 	// TODO: refactor as func getIamKeys
-	log.Println("key id               | status | username | days old | date")
-	getKeyInfo()
-	for _, v := range liko.AccessKeyMetadata {
-		// Calculate how many days old the key is.
-		daysOld := DaysOld(v.CreateDate)
-		log.Printf("%s | %v | %s | %v | %v\n", *v.AccessKeyId, v.Status, *v.UserName, daysOld, v.CreateDate)
-
-		// When older than maxDaysAllowed, then mark for deletion.
-		if daysOld > maxDaysAllowed && numKeys > maxKeysAllowed {
-			log.Printf("will delete key: %v", *v.AccessKeyId)
-			deleteKeys = append(deleteKeys, v)
-			continue
-		}
-
-		// When less than 30 days, then do nothing.
-		validKeys = append(validKeys, v)
-	}
+	//log.Println("key id               | status | username | days old | date")
+	//for _, v := range liko.AccessKeyMetadata {
+	//	// Calculate how many days old the key is.
+	//	daysOld := DaysOld(v.CreateDate)
+	//	log.Printf("%s | %v | %s | %v | %v\n", *v.AccessKeyId, v.Status, *v.UserName, daysOld, v.CreateDate)
+	//
+	//	// When older than maxDaysAllowed, then mark for deletion.
+	//	if daysOld > maxDaysAllowed && numKeys > maxKeysAllowed {
+	//		log.Printf("will delete key: %v", *v.AccessKeyId)
+	//		deleteKeys = append(deleteKeys, v)
+	//		continue
+	//	}
+	//
+	//	// When less than 30 days, then do nothing.
+	//	validKeys = append(validKeys, v)
+	//}
 
 	log.Printf("number of keys %v", numKeys)
 	log.Printf("\t%v are valid keys", len(validKeys))
@@ -245,4 +243,31 @@ func save(creds *iam.CreateAccessKeyOutput, ac *applicationFlags, hc httpCommuni
 		log.Println("saving to local credentials/profile")
 		return saveToLocalProfile(creds)
 	}
+}
+
+func getKeyInfo(ak []types.AccessKeyMetadata, daysAllowed, keysAllowed int) ([]types.AccessKeyMetadata, []types.AccessKeyMetadata) {
+	var deleteKeys []types.AccessKeyMetadata
+	var validKeys []types.AccessKeyMetadata
+
+	log.Println("key id               | status | username | days old | date")
+
+	numKeys := len(ak)
+
+	for _, v := range ak {
+		// Calculate how many days old the key is.
+		daysOld := DaysOld(v.CreateDate)
+		log.Printf("%s | %v | %s | %v | %v\n", *v.AccessKeyId, v.Status, *v.UserName, daysOld, v.CreateDate)
+
+		// When older than maxDaysAllowed, then mark for deletion.
+		if daysOld > daysAllowed && numKeys > keysAllowed {
+			log.Printf("will delete key: %v", *v.AccessKeyId)
+			deleteKeys = append(deleteKeys, v)
+			continue
+		}
+
+		// When less than 30 days, then do nothing.
+		validKeys = append(validKeys, v)
+	}
+
+	return validKeys, deleteKeys
 }
