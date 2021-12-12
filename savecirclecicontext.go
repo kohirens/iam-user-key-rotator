@@ -35,12 +35,12 @@ func updateCircleCIContextVar(name, val, token string, client httpCommunicator) 
 }
 
 // saveToCircleContext
-func saveToCircleContext(creds *iam.CreateAccessKeyOutput, cciToken string) error {
-	if err := updateCircleCIContextVar(keyVarName, *creds.AccessKey.AccessKeyId, cciToken, hClient); err != nil {
+func saveToCircleContext(creds *iam.CreateAccessKeyOutput, cciToken string, hc httpCommunicator) error {
+	if err := updateCircleCIContextVar(keyVarName, *creds.AccessKey.AccessKeyId, cciToken, hc); err != nil {
 		return err
 	}
 
-	if err := updateCircleCIContextVar(secretVarName, *creds.AccessKey.SecretAccessKey, cciToken, hClient); err != nil {
+	if err := updateCircleCIContextVar(secretVarName, *creds.AccessKey.SecretAccessKey, cciToken, hc); err != nil {
 		return err
 	}
 
