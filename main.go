@@ -43,6 +43,25 @@ type awsConfigOpts []func(*config.LoadOptions) error
 var httpComm httpCommunicator
 var optFns []func(*config.LoadOptions) error
 
+// RemoveKeyByIndex Removed IAM key from stats.
+func (is *iamStats) RemoveKeyByIndex(idx int) {
+	tmpK := is.keys[idx]
+	is.keys = append(is.keys[:idx], is.keys[idx+1:]...)
+
+	// Remove reference in old array.
+	for i, v := range is.old {
+		if v == &tmpK {
+			is.old = append(is.old[:i], is.old[i+1:]...)
+		}
+	}
+	// Remove reference in valid array.
+	for i, v := range is.valid {
+		if v == &tmpK {
+			is.valid = append(is.valid[:i], is.valid[i+1:]...)
+		}
+	}
+}
+
 func init() {
 	appFlags.define()
 }
@@ -106,28 +125,13 @@ func main() {
 		return
 	}
 
-	// TODO: Extract as func validKeys
-	numValidKeys := len(iamKeyStats.valid)
-	if numValidKeys > maxKeysAllowed {
-		// delete keys that we are not using, until we get to the max allowed.
-		for _, v := range iamKeyStats.valid {
-			if *v.AccessKeyId != currentId {
-				daki := &iam.DeleteAccessKeyInput{AccessKeyId: v.AccessKeyId}
-				_, err7 := iamClient.DeleteAccessKey(context.TODO(), daki)
-				if err7 != nil {
-					mainErr = fmt.Errorf("could not delete key %q; %v", *v.AccessKeyId, err7.Error())
-				}
-				log.Printf("removed key %v\n", *v.AccessKeyId)
-				numValidKeys--
-				if numValidKeys <= maxKeysAllowed {
-					break
-				}
-			}
-		}
+	if errX := removeExcessKeys(iamKeyStats, maxKeysAllowed, currentId, iamClient); errX != nil {
+		mainErr = errX
+		return
 	}
 
 	// If no valid keys are left, then make a new one.
-	if numValidKeys == 0 {
+	if len(iamKeyStats.valid) == 0 {
 		log.Println("no valid keys, making a new key")
 		newKey, err3 := iamClient.CreateAccessKey(context.TODO(), &iam.CreateAccessKeyInput{})
 		if err3 != nil {
@@ -142,9 +146,8 @@ func main() {
 			return
 		}
 
-		err4 := ioutil.WriteFile(filename, []byte(content), 0774)
-		if err4 != nil {
-			mainErr = fmt.Errorf("problem writing new access key %v", err0.Error())
+		if errX := ioutil.WriteFile(filename, content, 0774); errX != nil {
+			mainErr = fmt.Errorf("problem writing new access key %v", errX.Error())
 			return
 		}
 
@@ -283,4 +286,35 @@ func displayIamStats(stats *iamStats) {
 	log.Printf("number of keys %v", len(stats.keys))
 	log.Printf("\t%v are valid keys", len(stats.valid))
 	log.Printf("\t%v will be removed", len(stats.old))
+}
+
+func removeExcessKeys(stats *iamStats, maxKeysAllowed int, currentId string, iamClient *iam.Client) error {
+	numKeys := len(stats.keys)
+
+	if numKeys <= maxKeysAllowed {
+		return nil
+	}
+	// delete keys that we are not using, until we get to the max allowed.
+	for i, v := range stats.keys {
+		if *v.AccessKeyId == currentId {
+			continue
+		}
+		if v.Expired || len(stats.keys) > maxKeysAllowed {
+			daki := &iam.DeleteAccessKeyInput{AccessKeyId: v.AccessKeyId}
+			_, err7 := iamClient.DeleteAccessKey(context.TODO(), daki)
+			if err7 != nil {
+				return fmt.Errorf("could not delete key %q; %v", *v.AccessKeyId, err7.Error())
+			}
+			// Remove any reference to the deleted key.
+			stats.RemoveKeyByIndex(i)
+
+			log.Printf("removed key %v\n", *v.AccessKeyId)
+			numKeys--
+			if numKeys <= maxKeysAllowed {
+				break
+			}
+		}
+	}
+
+	return nil
 }
