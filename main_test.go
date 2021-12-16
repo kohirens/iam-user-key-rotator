@@ -129,11 +129,8 @@ func TestFlags(tester *testing.T) {
 }
 
 func TestGetIamKeyStats(tester *testing.T) {
-	if !isLocalStackAvailable() {
-		tester.Skip("unknown environment, skipping")
-	}
 	s1 := "ABC123"
-	t1 := time.Date(2021, 12, 15, 1, 0, 0, 0, time.UTC)
+	t1 := time.Now()
 	s2 := "ABCD1234"
 	t2 := time.Date(2021, 12, 10, 1, 0, 0, 0, time.UTC)
 
