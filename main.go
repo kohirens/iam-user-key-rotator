@@ -62,6 +62,20 @@ func (is *iamStats) RemoveKeyByIndex(idx int) {
 	}
 }
 
+// IsCurrentKeyExpired Indicates the current key is less than maxDaysOld.
+func (is *iamStats) IsCurrentKeyExpired() bool {
+	for _, v := range is.keys {
+		if *v.AccessKeyId == is.current {
+			return v.Expired
+		}
+	}
+
+	// The current key should always be present, unless there is broken logic that deleted it before it was time.
+	// Do NOT call this after the current key has been replaced. Which happens when the key has expired,
+	// and it must be replaced. Some lines later in main function.
+	panic("could not find current key")
+}
+
 func init() {
 	appFlags.define()
 }
@@ -130,24 +144,13 @@ func main() {
 		return
 	}
 
-	// If no valid keys are left, then make a new one.
-	if len(iamKeyStats.valid) == 0 {
+	// Make a new key when the current one has expired.
+	if iamKeyStats.IsCurrentKeyExpired() {
 		log.Println("no valid keys, making a new key")
-		newKey, err3 := iamClient.CreateAccessKey(context.TODO(), &iam.CreateAccessKeyInput{})
-		if err3 != nil {
-			mainErr = fmt.Errorf("problem with making a new access key: %v", err3.Error())
-		}
 
-		nk := awsKeyPair{*newKey.AccessKey.AccessKeyId, *newKey.AccessKey.SecretAccessKey, *newKey.AccessKey.UserName}
-
-		content, errj := json.Marshal(nk)
-		if errj != nil {
-			mainErr = fmt.Errorf("problem writing new access key %v", err0.Error())
-			return
-		}
-
-		if errX := ioutil.WriteFile(filename, content, 0774); errX != nil {
-			mainErr = fmt.Errorf("problem writing new access key %v", errX.Error())
+		newKey, errX := makeNewKey(iamKeyStats, iamClient)
+		if errX != nil {
+			mainErr = errX
 			return
 		}
 
@@ -155,7 +158,7 @@ func main() {
 			httpComm = &http.Client{}
 		}
 
-		if err := save(newKey, appFlags, httpComm); err != nil {
+		if err := save(newKey, appFlags, httpComm, filename); err != nil {
 			mainErr = err
 			return
 		}
@@ -221,11 +224,34 @@ func makeRoomForKey(currentId string, deleteKeys []*iamKeyInfo, iamClient *iam.C
 	return nil
 }
 
+// makeNewKey Add a new IAM key.
+func makeNewKey(stats *iamStats, iamClient *iam.Client) (*iam.CreateAccessKeyOutput, error) {
+
+	// If no valid keys are left, then make a new one.
+	if stats.IsCurrentKeyExpired() {
+		return nil, nil
+	}
+
+	log.Println(stdMsgs.expireKey)
+
+	newKey, err1 := iamClient.CreateAccessKey(context.TODO(), &iam.CreateAccessKeyInput{})
+	if err1 != nil {
+		return nil, fmt.Errorf(errors.probMakingNewKey, err1.Error())
+	}
+
+	return newKey, nil
+}
+
 // save AWS credentials to a medium.
-func save(creds *iam.CreateAccessKeyOutput, ac *applicationFlags, hc httpCommunicator) error {
+func save(creds *iam.CreateAccessKeyOutput, ac *applicationFlags, hc httpCommunicator, filename string) error {
 	saveMode := ""
 	if *(appFlags.circleci) != "" {
 		saveMode = "circleci"
+	}
+
+	// Always save to a local file.
+	if err := saveToFile(creds, filename); err != nil {
+		return err
 	}
 
 	switch saveMode {
@@ -236,6 +262,22 @@ func save(creds *iam.CreateAccessKeyOutput, ac *applicationFlags, hc httpCommuni
 		log.Println("saving to local credentials/profile")
 		return saveToLocalProfile(creds)
 	}
+}
+
+// saveToFile Save the new key to a local file as JSON.
+func saveToFile(newKey *iam.CreateAccessKeyOutput, filename string) error {
+	nk := awsKeyPair{*newKey.AccessKey.AccessKeyId, *newKey.AccessKey.SecretAccessKey, *newKey.AccessKey.UserName}
+
+	content, err1 := json.Marshal(nk)
+	if err1 != nil {
+		return fmt.Errorf(errors.translateKeyToJsonErr, err1.Error())
+	}
+
+	if err := ioutil.WriteFile(filename, content, 0774); err != nil {
+		return fmt.Errorf(errors.writingNewKeyErr, err.Error())
+	}
+
+	return nil
 }
 
 func newIamStats(c string) *iamStats {
@@ -273,6 +315,7 @@ func getIamKeyStats(ak []types.AccessKeyMetadata, daysAllowed int, currentId str
 	return stats
 }
 
+// displayIamStats Display info that allows the user to understand what is happening.
 func displayIamStats(stats *iamStats) {
 	// Header
 	log.Println("key id               | status | username | days old | date")
