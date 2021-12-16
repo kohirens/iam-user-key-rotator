@@ -2,22 +2,25 @@
 
 ## Summary
 
-Use an IAM user to auto rotate its own programmable key/pair every so many
+Have your IAM user automatically rotate its own programmable key/pair every so many
 (default is 30) days.
 
 ## Description
 
 This is meant to run in a CI workflow that requires IAM credentials. It will
 check its credentials are current, if not, then use its current credentials to
-make new credentials; replace the existing credentials (in the CI environment).
+make new credentials; replace the existing credentials (in the CI environment, using the API).
 Then delete the old/existing one from AWS.
 
-NOTE: You are responsible for updating the existing ones with the new credentials
-      placed in the environment.
+### Use Cases
 
-This programs uses its current AWS credentials to auto rotate its own
-credentials. To perform the actions needed the IAM user should have an inline
-policy that like so:
+* Run to rotate your local keys.
+* In a Circle CI job for keys stored in a context.
+* Anywhere you can run this tool.
+
+This programs uses currently set AWS config/credentials to auto rotate the current IAM user on
+credentials. To perform the actions needed, then the IAM user MUST have a
+policy that allows these actions:
 
 ```json
 {
@@ -27,7 +30,8 @@ policy that like so:
             "Sid": "VisualEditor0",
             "Effect": "Allow",
             "Action": [
-                "iam:DeleteAccessKey",
+                "iam:DeleteAccessKey"p
+
                 "iam:CreateAccessKey",
                 "iam:ListAccessKeys"
             ],
@@ -37,24 +41,28 @@ policy that like so:
 }
 ```
 
-Because you can have credentials store anywhere, we've opted to have them placed
-in a JSON file. Should the CI fail, and you lose the new key, then the only way
-to recover is to delete the key/secret combo, manually make a new key/secret
-pair, and manually update your local credentials or CI context.
+Once a new key/pair is made, it will be placed
+in a JSON file where the command was run. Should it fail, and you lose the new key, then you need to
+go into the AWS console and make a new key pair and manually update the environment.
 
 NOTE: Currently AWS only allows 2 programmatic key/secret pairs per
 IAM user. Because of this restriction, the user can only have 1 secret/key pair
 at a time, as the script needs 1 to be available
-to make new one key for the rotation (30 days by default, see `maxDaysAllowed` flag).
+to make a new key for the rotation (30 days by default, see `maxDaysAllowed` flag).
 
-It should also be allowed to work with a Lambda, to rotate a list of IAM users
-after `maxDaysAllowed` days. But this functionality can also be a separate CLI from this
+In theory you could run this in a Lambda to rotate a list of IAM users
+after `maxDaysAllowed` day, then update then in a secrets manager through API calls.
+But this functionality would need to be built out as a separate CLI from this
 project.
 
-1. Load AWS IAM Credentials.
-2. Read all existing IAM user keys.
+## How It Works
+
+Here are the steps this program takes:
+
+1. Load AWS IAM credentials (pulled from AWS defaults).
+2. Read all existing keys for the user.
 3. Calculate how many days old the keys are.
-4. If only there are only `maxKeysAllowed` and they are active less than `maxDaysAllowed`, then do nothing.
+    1. If they are and they are active less than `maxDaysAllowed`, then do nothing.
 5. If any keys are older than the `maxKeysAllowed` days:
    1. Remove all except `maxKeysAllowed`, then:
       1. rotate remaining key
