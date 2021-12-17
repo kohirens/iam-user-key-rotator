@@ -12,6 +12,10 @@ check its credentials are current, if not, then use its current credentials to
 make new credentials; replace the existing credentials (in the CI environment, using the API).
 Then delete the old/existing one from AWS.
 
+## Status
+
+[![CircleCI](https://circleci.com/gh/kohirens/version-release-orb/tree/main.svg?style=svg)](https://circleci.com/gh/kohirens/version-release-orb/tree/main)
+
 ### Use Cases
 
 * Run to rotate your local keys.
