@@ -165,13 +165,9 @@ func main() {
 	}
 
 	// Delete any remaining keys (which should only be the current key if any).
-	for _, v := range iamKeyStats.old {
-		daki := &iam.DeleteAccessKeyInput{AccessKeyId: v.AccessKeyId}
-		_, err7 := iamClient.DeleteAccessKey(context.TODO(), daki)
-		if err7 != nil {
-			mainErr = fmt.Errorf("could not delete key %q; %v", *v.AccessKeyId, err7.Error())
-		}
-		log.Printf("removed key %v\n", *v.AccessKeyId)
+	if err := deleteKeys(iamKeyStats.old, iamClient); err != nil {
+		mainErr = err
+		return
 	}
 }
 
@@ -182,7 +178,7 @@ func DaysOld(someDate *time.Time) int {
 	return int(days)
 }
 
-func deleteKey(deleteKeys []types.AccessKeyMetadata, iamClient *iam.Client) error {
+func deleteKeys(deleteKeys []*iamKeyInfo, iamClient awsCaller) error {
 	for _, v := range deleteKeys {
 		daki := &iam.DeleteAccessKeyInput{AccessKeyId: v.AccessKeyId}
 		_, err7 := iamClient.DeleteAccessKey(context.TODO(), daki)
@@ -207,8 +203,13 @@ func getAwsConfig(ac *applicationFlags) (aws.Config, error) {
 	return config.LoadDefaultConfig(context.TODO(), optFns...)
 }
 
+type awsCaller interface {
+	DeleteAccessKey(ctx context.Context, params *iam.DeleteAccessKeyInput, optFns ...func(*iam.Options)) (*iam.DeleteAccessKeyOutput, error)
+	CreateAccessKey(ctx context.Context, params *iam.CreateAccessKeyInput, optFns ...func(*iam.Options)) (*iam.CreateAccessKeyOutput, error)
+}
+
 // makeRoomForKey Deletes all IAM keys in the delete key list except for the current access ID in use.
-func makeRoomForKey(currentId string, deleteKeys []*iamKeyInfo, iamClient *iam.Client) error {
+func makeRoomForKey(currentId string, deleteKeys []*iamKeyInfo, iamClient awsCaller) error {
 	for _, v := range deleteKeys {
 		// delete all keys marked for deletion, except the one we are using.
 		if *v.AccessKeyId != currentId {
@@ -225,10 +226,10 @@ func makeRoomForKey(currentId string, deleteKeys []*iamKeyInfo, iamClient *iam.C
 }
 
 // makeNewKey Add a new IAM key.
-func makeNewKey(stats *iamStats, iamClient *iam.Client) (*iam.CreateAccessKeyOutput, error) {
+func makeNewKey(stats *iamStats, iamClient awsCaller) (*iam.CreateAccessKeyOutput, error) {
 
-	// If no valid keys are left, then make a new one.
-	if stats.IsCurrentKeyExpired() {
+	// Skip if not expired.
+	if !stats.IsCurrentKeyExpired() {
 		return nil, nil
 	}
 
@@ -331,7 +332,7 @@ func displayIamStats(stats *iamStats) {
 	log.Printf("\t%v will be removed", len(stats.old))
 }
 
-func removeExcessKeys(stats *iamStats, maxKeysAllowed int, currentId string, iamClient *iam.Client) error {
+func removeExcessKeys(stats *iamStats, maxKeysAllowed int, currentId string, iamClient awsCaller) error {
 	numKeys := len(stats.keys)
 
 	if numKeys <= maxKeysAllowed {

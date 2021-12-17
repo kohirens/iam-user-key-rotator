@@ -6,6 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.11.0
 	github.com/aws/aws-sdk-go-v2/config v1.10.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.12.0
+	github.com/aws/smithy-go v1.9.0
 )
 
 require (
@@ -17,5 +18,4 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.5.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.6.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.9.0 // indirect
-	github.com/aws/smithy-go v1.9.0 // indirect
 )
