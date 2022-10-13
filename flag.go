@@ -22,7 +22,7 @@ var appFlags = new(applicationFlags)
 func (af *applicationFlags) define() {
 	// NOTE: This code is redundant, but if we try to dry it out then it could get overly complicated and ruin the
 	// simplicity. Though I do like the idea of only adding a new field to the applicationFlags and automating lines
-	// added here.
+	// added here and elsewhere.
 	appFlags.maxDaysAllowed = flag.Int("maxDaysAllowed", 30, flagUsages["maxDaysAllowed"])
 	appFlags.maxKeysAllowed = flag.Int("maxKeysAllowed", 1, flagUsages["maxKeysAllowed"])
 	appFlags.region = flag.String("region", "", flagUsages["region"])
