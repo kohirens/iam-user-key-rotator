@@ -34,7 +34,7 @@ policy that allows these actions:
             "Sid": "VisualEditor0",
             "Effect": "Allow",
             "Action": [
-                "iam:DeleteAccessKey"p
+                "iam:DeleteAccessKey",
 
                 "iam:CreateAccessKey",
                 "iam:ListAccessKeys"
